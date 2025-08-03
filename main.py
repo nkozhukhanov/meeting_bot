@@ -138,6 +138,16 @@ class MeetingBot:
                 )
                 return
             
+            # Check Whisper API size limit
+            if not self.audio_processor.check_whisper_size_limit(file_size):
+                await update.message.reply_text(
+                    f"❌ Файл слишком большой для обработки.\n"
+                    f"Размер: {file_size / 1024 / 1024:.1f} МБ\n"
+                    f"Максимум: 24 МБ\n\n"
+                    f"Попробуйте сжать файл или разделить на части."
+                )
+                return
+            
             # Send processing message
             processing_msg = await update.message.reply_text(
                 "🔄 Обрабатываю запись встречи...\n"

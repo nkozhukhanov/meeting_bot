@@ -12,6 +12,7 @@ class AudioProcessor:
     def __init__(self):
         self.client = AsyncOpenAI(api_key=config.openai_api_key)
         self.max_file_size = config.max_file_size_mb * 1024 * 1024  # Convert to bytes
+        self.whisper_max_size = 24 * 1024 * 1024  # 24 MB - safe limit for Whisper API
     
     def validate_audio_file(self, file_path: str, file_size: int) -> bool:
         """Validate audio file format and size."""
@@ -25,6 +26,13 @@ class AudioProcessor:
         
         return True
     
+    def check_whisper_size_limit(self, file_size: int) -> bool:
+        """Check if file is within Whisper API size limit."""
+        if file_size > self.whisper_max_size:
+            app_logger.warning(f"File too large for Whisper API: {file_size} bytes (max: {self.whisper_max_size})")
+            return False
+        return True
+    
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=4, max=10)
@@ -34,6 +42,13 @@ class AudioProcessor:
         try:
             app_logger.info(f"Starting transcription for: {file_path}")
             
+            # Check file size before processing
+            file_size = os.path.getsize(file_path)
+            app_logger.info(f"File size: {file_size} bytes ({file_size / 1024 / 1024:.2f} MB)")
+            
+            if not self.check_whisper_size_limit(file_size):
+                raise ValueError(f"File size {file_size / 1024 / 1024:.2f} MB exceeds Whisper API limit of 24 MB")
+            
             async with aiofiles.open(file_path, 'rb') as audio_file:
                 audio_data = await audio_file.read()
             
@@ -41,6 +56,8 @@ class AudioProcessor:
             import io
             audio_buffer = io.BytesIO(audio_data)
             audio_buffer.name = os.path.basename(file_path)
+            
+            app_logger.info(f"Sending {len(audio_data)} bytes to Whisper API")
             
             response = await self.client.audio.transcriptions.create(
                 model="whisper-1",
