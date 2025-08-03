@@ -108,11 +108,11 @@ class MeetingBot:
         try:
             app_logger.info(f"File received from user {update.effective_user.id}")
             
-            # Handle both audio messages and documents
+            # Get file info and validate BEFORE downloading
             if update.message.audio:
-                file = await context.bot.get_file(update.message.audio.file_id)
                 file_size = update.message.audio.file_size
                 filename = update.message.audio.file_name or "audio.m4a"
+                file_id = update.message.audio.file_id
             elif update.message.document:
                 # Check if document is an audio file
                 doc = update.message.document
@@ -122,23 +122,16 @@ class MeetingBot:
                     )
                     return
                 
-                file = await context.bot.get_file(doc.file_id)
                 file_size = doc.file_size
                 filename = doc.file_name
+                file_id = doc.file_id
             else:
                 await update.message.reply_text(
                     "❌ Неподдерживаемый тип файла. Отправьте .m4a аудиофайл."
                 )
                 return
             
-            # Validate file
-            if not self.audio_processor.validate_audio_file(filename, file_size):
-                await update.message.reply_text(
-                    "❌ Неподдерживаемый файл. Пожалуйста, отправьте .m4a файл размером до 20 МБ."
-                )
-                return
-            
-            # Check Telegram Bot API size limit (20 MB)
+            # Check Telegram Bot API size limit FIRST (20 MB)
             telegram_max_size = 20 * 1024 * 1024  # 20 MB
             if file_size > telegram_max_size:
                 await update.message.reply_text(
@@ -149,6 +142,13 @@ class MeetingBot:
                 )
                 return
             
+            # Validate file format and basic size
+            if not self.audio_processor.validate_audio_file(filename, file_size):
+                await update.message.reply_text(
+                    "❌ Неподдерживаемый файл. Пожалуйста, отправьте .m4a файл размером до 20 МБ."
+                )
+                return
+            
             # Check Whisper API size limit
             if not self.audio_processor.check_whisper_size_limit(file_size):
                 await update.message.reply_text(
@@ -156,6 +156,16 @@ class MeetingBot:
                     f"Размер: {file_size / 1024 / 1024:.1f} МБ\n"
                     f"Максимум: 24 МБ\n\n"
                     f"Попробуйте сжать файл или разделить на части."
+                )
+                return
+            
+            # Now safely get the file after validation
+            try:
+                file = await context.bot.get_file(file_id)
+            except Exception as e:
+                app_logger.error(f"Failed to get file from Telegram: {str(e)}")
+                await update.message.reply_text(
+                    "❌ Ошибка при получении файла от Telegram. Попробуйте еще раз."
                 )
                 return
             
