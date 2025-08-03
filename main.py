@@ -36,9 +36,9 @@ class MeetingBot:
         self.application.add_handler(CommandHandler("start", self.start_command))
         self.application.add_handler(CommandHandler("help", self.help_command))
         
-        # Audio file handler
+        # Audio file handler - handle both audio messages and documents with audio extensions
         self.application.add_handler(
-            MessageHandler(filters.AUDIO | filters.Document.AUDIO, self.handle_audio)
+            MessageHandler(filters.AUDIO | filters.Document.ALL, self.handle_audio)
         )
         
         # Fallback for other messages
@@ -106,12 +106,30 @@ class MeetingBot:
     async def handle_audio(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle audio file uploads."""
         try:
-            app_logger.info(f"Audio file received from user {update.effective_user.id}")
+            app_logger.info(f"File received from user {update.effective_user.id}")
             
-            # Get file info
-            file = await context.bot.get_file(update.message.audio.file_id)
-            file_size = update.message.audio.file_size
-            filename = update.message.audio.file_name or "audio.m4a"
+            # Handle both audio messages and documents
+            if update.message.audio:
+                file = await context.bot.get_file(update.message.audio.file_id)
+                file_size = update.message.audio.file_size
+                filename = update.message.audio.file_name or "audio.m4a"
+            elif update.message.document:
+                # Check if document is an audio file
+                doc = update.message.document
+                if not doc.file_name or not doc.file_name.lower().endswith('.m4a'):
+                    await update.message.reply_text(
+                        "❌ Пожалуйста, отправьте аудиофайл в формате .m4a"
+                    )
+                    return
+                
+                file = await context.bot.get_file(doc.file_id)
+                file_size = doc.file_size
+                filename = doc.file_name
+            else:
+                await update.message.reply_text(
+                    "❌ Неподдерживаемый тип файла. Отправьте .m4a аудиофайл."
+                )
+                return
             
             # Validate file
             if not self.audio_processor.validate_audio_file(filename, file_size):
