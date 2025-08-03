@@ -1,0 +1,19 @@
+{
+  "name": "telegram-meeting-summary-bot",
+  "version": "1.0.0",
+  "description": "Telegram bot for automatic meeting transcription and summarization",
+  "main": "main.py",
+  "scripts": {
+    "start": "python main.py",
+    "dev": "python main.py",
+    "test": "pytest tests/",
+    "lint": "flake8 .",
+    "format": "black ."
+  },
+  "keywords": ["telegram", "bot", "meeting", "summary", "whisper", "gpt"],
+  "author": "Meeting Bot Team",
+  "license": "MIT",
+  "engines": {
+    "python": ">=3.9"
+  }
+}
