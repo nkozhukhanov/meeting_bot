@@ -33,7 +33,7 @@ class Config:
     
     # File Storage Configuration
     storage_path: str = os.getenv("STORAGE_PATH", "./temp_files")
-    max_file_size_mb: int = int(os.getenv("MAX_FILE_SIZE_MB", "100"))
+    max_file_size_mb: int = int(os.getenv("MAX_FILE_SIZE_MB", "20"))  # Reduced to match Telegram limit
     file_retention_hours: int = int(os.getenv("FILE_RETENTION_HOURS", "24"))
     
     # Logging Configuration
