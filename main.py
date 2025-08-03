@@ -1,5 +1,6 @@
 import asyncio
 import os
+from aiohttp import web
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 from telegram.constants import ParseMode
@@ -186,11 +187,30 @@ class MeetingBot:
             "Используйте /help для получения дополнительной информации."
         )
     
+    async def create_health_server(self):
+        """Create a simple health check server for Railway."""
+        async def health_check(request):
+            return web.Response(text="OK", status=200)
+        
+        app = web.Application()
+        app.router.add_get('/health', health_check)
+        app.router.add_get('/', health_check)
+        
+        return app
+
     async def run(self):
         """Start the bot."""
         app_logger.info("Starting Meeting Bot...")
         
         import signal
+        
+        # Start health check server for Railway
+        health_app = await self.create_health_server()
+        runner = web.AppRunner(health_app)
+        await runner.setup()
+        site = web.TCPSite(runner, '0.0.0.0', config.port)
+        await site.start()
+        app_logger.info(f"Health check server started on port {config.port}")
         
         # Start file cleanup scheduler
         asyncio.create_task(self.file_manager.start_cleanup_scheduler())
