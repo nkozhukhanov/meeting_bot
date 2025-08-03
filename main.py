@@ -155,14 +155,19 @@ class MeetingBot:
                     "⏳ Это может занять несколько минут."
                 )
                 
+                app_logger.info(f"Starting transcription for user {update.effective_user.id}, file: {filename}")
+                
                 # Transcribe audio
                 transcript = await self.audio_processor.transcribe_audio(file_path)
                 
                 if not transcript:
+                    app_logger.error(f"Transcription failed for user {update.effective_user.id}")
                     await processing_msg.edit_text(
                         "❌ Не удалось создать транскрипцию. Попробуйте еще раз."
                     )
                     return
+                
+                app_logger.info(f"Transcription successful for user {update.effective_user.id}, length: {len(transcript)}")
                 
                 # Update status
                 await processing_msg.edit_text(
@@ -171,13 +176,17 @@ class MeetingBot:
                 )
                 
                 # Create summary
+                app_logger.info(f"Starting summary creation for user {update.effective_user.id}")
                 summary = await self.summarizer.create_summary(transcript)
                 
                 if not summary:
+                    app_logger.error(f"Summary creation failed for user {update.effective_user.id}")
                     await processing_msg.edit_text(
                         "❌ Не удалось создать саммари. Попробуйте еще раз."
                     )
                     return
+                
+                app_logger.info(f"Summary created successfully for user {update.effective_user.id}")
                 
                 # Send summary
                 formatted_summary = self.summarizer.format_summary_message(summary)
@@ -193,10 +202,28 @@ class MeetingBot:
                 await self.audio_processor.cleanup_file(file_path)
                 
         except Exception as e:
-            app_logger.error(f"Error processing audio: {str(e)}")
-            await update.message.reply_text(
-                "❌ Произошла ошибка при обработке файла. Пожалуйста, попробуйте еще раз."
-            )
+            import traceback
+            error_details = traceback.format_exc()
+            app_logger.error(f"Error processing audio from user {update.effective_user.id}: {str(e)}")
+            app_logger.error(f"Full traceback: {error_details}")
+            
+            # More specific error messages
+            if "whisper" in str(e).lower() or "transcription" in str(e).lower():
+                await update.message.reply_text(
+                    "❌ Ошибка при создании транскрипции. Проверьте формат файла и попробуйте еще раз."
+                )
+            elif "gpt" in str(e).lower() or "summary" in str(e).lower():
+                await update.message.reply_text(
+                    "❌ Ошибка при создании саммари. Попробуйте еще раз через несколько минут."
+                )
+            elif "file" in str(e).lower() or "download" in str(e).lower():
+                await update.message.reply_text(
+                    "❌ Ошибка при загрузке файла. Убедитесь, что файл не поврежден."
+                )
+            else:
+                await update.message.reply_text(
+                    f"❌ Произошла ошибка при обработке файла: {str(e)[:200]}..."
+                )
     
     async def handle_text(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle text messages."""
