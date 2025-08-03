@@ -22,19 +22,41 @@ class FileManager:
     async def save_audio_file(self, file_data: bytes, filename: str) -> str:
         """Save audio file to temporary storage."""
         try:
+            # Check available disk space (basic check)
+            import shutil
+            free_space = shutil.disk_usage(self.storage_path).free
+            file_size = len(file_data)
+            
+            app_logger.info(f"Saving file: {filename}, size: {file_size} bytes, free space: {free_space} bytes")
+            
+            if file_size > free_space:
+                raise OSError(f"Not enough disk space. Need: {file_size}, Available: {free_space}")
+            
             # Generate unique filename with timestamp
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             unique_filename = f"{timestamp}_{filename}"
             file_path = os.path.join(self.storage_path, unique_filename)
             
+            app_logger.info(f"Writing to path: {file_path}")
+            
             async with aiofiles.open(file_path, 'wb') as f:
                 await f.write(file_data)
             
-            app_logger.info(f"File saved: {file_path} ({len(file_data)} bytes)")
+            # Verify file was written correctly
+            if os.path.exists(file_path):
+                actual_size = os.path.getsize(file_path)
+                app_logger.info(f"File saved successfully: {file_path} (expected: {file_size}, actual: {actual_size} bytes)")
+                
+                if actual_size != file_size:
+                    raise OSError(f"File size mismatch. Expected: {file_size}, Got: {actual_size}")
+            else:
+                raise OSError(f"File was not created: {file_path}")
+            
             return file_path
             
         except Exception as e:
             app_logger.error(f"Failed to save file {filename}: {str(e)}")
+            app_logger.error(f"Storage path: {self.storage_path}, exists: {os.path.exists(self.storage_path)}")
             raise
     
     async def cleanup_old_files(self):

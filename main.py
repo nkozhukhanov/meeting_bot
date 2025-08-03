@@ -154,9 +154,28 @@ class MeetingBot:
                 "⏳ Это может занять несколько минут."
             )
             
-            # Download and save file
-            file_data = await file.download_as_bytearray()
-            file_path = await self.file_manager.save_audio_file(file_data, filename)
+            # Download and save file with detailed logging
+            app_logger.info(f"Starting file download for user {update.effective_user.id}, size: {file_size} bytes")
+            
+            try:
+                file_data = await file.download_as_bytearray()
+                app_logger.info(f"File downloaded successfully, actual size: {len(file_data)} bytes")
+            except Exception as e:
+                app_logger.error(f"File download failed: {str(e)}")
+                await processing_msg.edit_text(
+                    "❌ Ошибка при загрузке файла из Telegram. Попробуйте еще раз."
+                )
+                return
+            
+            try:
+                file_path = await self.file_manager.save_audio_file(file_data, filename)
+                app_logger.info(f"File saved to: {file_path}")
+            except Exception as e:
+                app_logger.error(f"File save failed: {str(e)}")
+                await processing_msg.edit_text(
+                    "❌ Ошибка при сохранении файла. Попробуйте еще раз."
+                )
+                return
             
             try:
                 # Update status
